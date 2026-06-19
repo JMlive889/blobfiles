@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../auth/auth_provider.dart';
+import '../auth/oauth_return_handler.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 
@@ -21,13 +22,45 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _isSignIn = true;
-  bool _isLoading = false;
+  bool _isSubmittingEmail = false;
+  bool _isGoogleLoading = false;
   String? _errorMessage;
   String? _infoMessage;
 
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+
+  bool get _isEmailBusy => _isSubmittingEmail;
+  bool get _isGoogleBusy => _isGoogleLoading;
+
+  @override
+  void initState() {
+    super.initState();
+    if (kIsWeb) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _handleOAuthReturn();
+      });
+    }
+  }
+
+  void _handleOAuthReturn() {
+    final message = OAuthReturnHandler.canceledMessageFromCurrentUrl();
+    if (message == null) {
+      return;
+    }
+
+    OAuthReturnHandler.cleanCurrentUrl();
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isGoogleLoading = false;
+      _infoMessage = message;
+      _errorMessage = null;
+    });
+  }
 
   @override
   void dispose() {
@@ -44,9 +77,46 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
   }
 
+  Future<bool> _confirmGoogleRedirect() async {
+    final shouldContinue = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Continue with Google?'),
+          content: const Text(
+            "You'll be redirected to Google to sign in.\n\n"
+            'To cancel at any time, use your browser back button or close '
+            "Google's sign-in page — you'll return here and can use email "
+            'instead.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Stay on this page'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Continue to Google'),
+            ),
+          ],
+        );
+      },
+    );
+
+    return shouldContinue ?? false;
+  }
+
   Future<void> _signInWithGoogle() async {
     _clearMessages();
-    setState(() => _isLoading = true);
+
+    if (kIsWeb) {
+      final shouldContinue = await _confirmGoogleRedirect();
+      if (!shouldContinue || !mounted) {
+        return;
+      }
+    } else {
+      setState(() => _isGoogleLoading = true);
+    }
 
     try {
       await AuthService.instance.signInWithGoogle();
@@ -61,11 +131,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (!mounted) return;
       final message = AuthService.messageFromError(error);
       if (message == 'Google sign in was canceled.') {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isGoogleLoading = false;
+          _infoMessage =
+              'Google sign in was canceled. You can try again or use email instead.';
+        });
         return;
       }
       setState(() {
-        _isLoading = false;
+        _isGoogleLoading = false;
         _errorMessage = message;
       });
     }
@@ -77,7 +151,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() => _isSubmittingEmail = true);
 
     try {
       if (_isSignIn) {
@@ -89,7 +163,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         if (response.session == null) {
           if (!mounted) return;
           setState(() {
-            _isLoading = false;
+            _isSubmittingEmail = false;
             _errorMessage =
                 'Sign in failed. Check your email and password, or confirm your email first.';
           });
@@ -104,7 +178,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         if (response.session == null) {
           if (!mounted) return;
           setState(() {
-            _isLoading = false;
+            _isSubmittingEmail = false;
             _infoMessage =
                 'Account created. Check your email to confirm, then sign in.';
           });
@@ -119,14 +193,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _isLoading = false;
+        _isSubmittingEmail = false;
         _errorMessage = AuthService.messageFromError(error);
       });
       return;
     }
 
     if (mounted) {
-      setState(() => _isLoading = false);
+      setState(() => _isSubmittingEmail = false);
     }
   }
 
@@ -140,7 +214,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         leading: IconButton(
           tooltip: 'Back',
           icon: const Icon(Icons.arrow_back),
-          onPressed: _isLoading ? null : () => context.go('/landing'),
+          onPressed: _isEmailBusy ? null : () => context.go('/landing'),
         ),
       ),
       body: SafeArea(
@@ -163,9 +237,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const SizedBox(height: 32),
                     _AuthModeToggle(
                       isSignIn: _isSignIn,
-                      isEnabled: !_isLoading,
+                      isEnabled: !_isEmailBusy && !_isGoogleBusy,
                       onChanged: (isSignIn) {
-                        if (_isLoading) return;
+                        if (_isEmailBusy || _isGoogleBusy) return;
                         setState(() {
                           _isSignIn = isSignIn;
                           _errorMessage = null;
@@ -177,13 +251,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     _SocialAuthButton(
                       label: 'Continue with Google',
                       icon: Icons.g_mobiledata_rounded,
-                      onPressed: _isLoading ? null : _signInWithGoogle,
+                      onPressed: (_isEmailBusy || _isGoogleBusy)
+                          ? null
+                          : _signInWithGoogle,
                     ),
+                    if (kIsWeb) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'Redirects to Google. Use your browser back button to cancel.',
+                        textAlign: TextAlign.center,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     _SocialAuthButton(
                       label: 'Continue with X',
                       icon: Icons.close_rounded,
-                      onPressed: _isLoading ? null : _onXSignIn,
+                      onPressed: (_isEmailBusy || _isGoogleBusy)
+                          ? null
+                          : _onXSignIn,
                     ),
                     const SizedBox(height: 32),
                     if (_errorMessage != null) ...[
@@ -209,7 +297,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       hint: 'you@example.com',
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
-                      enabled: !_isLoading,
+                      enabled: !_isEmailBusy,
                       validator: (value) {
                         final email = value?.trim() ?? '';
                         if (email.isEmpty) {
@@ -229,7 +317,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       obscureText: true,
                       textInputAction:
                           _isSignIn ? TextInputAction.done : TextInputAction.next,
-                      enabled: !_isLoading,
+                      enabled: !_isEmailBusy,
                       validator: (value) {
                         if ((value ?? '').isEmpty) {
                           return 'Enter your password';
@@ -248,7 +336,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         hint: 'Re-enter your password',
                         obscureText: true,
                         textInputAction: TextInputAction.done,
-                        enabled: !_isLoading,
+                        enabled: !_isEmailBusy,
                         validator: (value) {
                           if ((value ?? '').isEmpty) {
                             return 'Confirm your password';
@@ -265,7 +353,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       Align(
                         alignment: Alignment.centerRight,
                         child: TextButton(
-                          onPressed: _isLoading ? null : _onForgotPassword,
+                          onPressed: _isEmailBusy ? null : _onForgotPassword,
                           style: TextButton.styleFrom(
                             padding: EdgeInsets.zero,
                             minimumSize: Size.zero,
@@ -279,9 +367,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: _isLoading ? null : _submit,
+                        onPressed: _isEmailBusy ? null : _submit,
                         style: ElevatedButton.styleFrom(shape: AppTheme.shapeBorder),
-                        child: _isLoading
+                        child: _isEmailBusy
                             ? SizedBox(
                                 height: 22,
                                 width: 22,
