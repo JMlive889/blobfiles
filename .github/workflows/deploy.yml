@@ -1,0 +1,70 @@
+# Builds the Flutter web app and deploys static output to Vercel on every push to main.
+#
+# Required GitHub repository secrets:
+#   VERCEL_TOKEN       — Vercel personal/team token (Account Settings → Tokens)
+#   VERCEL_ORG_ID      — Team or user ID (.vercel/project.json or Vercel dashboard)
+#   VERCEL_PROJECT_ID  — Project ID linked to this repo
+#
+# Optional: add GOOGLE_WEB_CLIENT_ID as a secret and pass it via --dart-define in the
+# build step if Google Sign-In should be enabled in production.
+
+name: Deploy Flutter Web to Vercel
+
+on:
+  push:
+    branches:
+      - main
+
+# Avoid overlapping production deploys when multiple commits land in quick succession.
+concurrency:
+  group: vercel-production
+  cancel-in-progress: true
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+jobs:
+  deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── Source ──────────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Flutter toolchain ───────────────────────────────────────────────────
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Dart/Flutter dependencies
+        run: flutter pub get
+
+      - name: Build Flutter web (release)
+        run: flutter build web --release
+
+      # GoRouter needs SPA fallback rewrites so deep links resolve to index.html.
+      - name: Add Vercel SPA routing config to build output
+        run: |
+          cat > build/web/vercel.json <<'EOF'
+          {
+            "rewrites": [
+              { "source": "/(.*)", "destination": "/index.html" }
+            ]
+          }
+          EOF
+
+      # ── Vercel deployment ───────────────────────────────────────────────────
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      # Sync production project settings (env, framework config) into the runner.
+      - name: Pull Vercel project settings
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy to Vercel (production)
+        run: vercel deploy build/web --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
