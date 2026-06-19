@@ -65,7 +65,11 @@ class AuthService {
   /// - **Web:** Supabase OAuth redirect flow.
   /// - **iOS/Android:** [google_sign_in] + Supabase ID token exchange.
   Future<void> signInWithGoogle() async {
-    _assertGoogleConfigured();
+    // Web uses Supabase OAuth (Google client is configured in Supabase dashboard).
+    // Native platforms need GOOGLE_WEB_CLIENT_ID at compile time.
+    if (!kIsWeb) {
+      _assertGoogleConfigured();
+    }
 
     if (kIsWeb) {
       await _signInWithGoogleOAuth();

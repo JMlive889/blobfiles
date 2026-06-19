@@ -5,8 +5,8 @@
 #   VERCEL_ORG_ID      — Team or user ID (.vercel/project.json or Vercel dashboard)
 #   VERCEL_PROJECT_ID  — Project ID linked to this repo
 #
-# Optional: add GOOGLE_WEB_CLIENT_ID as a secret and pass it via --dart-define in the
-# build step if Google Sign-In should be enabled in production.
+# Optional: GOOGLE_WEB_CLIENT_ID secret — required for native builds; web OAuth uses
+# Supabase and does not need it, but passing it keeps GoogleConfig consistent.
 
 name: Deploy Flutter Web to Vercel
 
@@ -45,7 +45,14 @@ jobs:
         run: flutter pub get
 
       - name: Build Flutter web (release)
-        run: flutter build web --release
+        env:
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+        run: |
+          BUILD_ARGS=(--release)
+          if [ -n "$GOOGLE_WEB_CLIENT_ID" ]; then
+            BUILD_ARGS+=(--dart-define=GOOGLE_WEB_CLIENT_ID="$GOOGLE_WEB_CLIENT_ID")
+          fi
+          flutter build web "${BUILD_ARGS[@]}"
 
       # GoRouter needs SPA fallback rewrites so deep links resolve to index.html.
       - name: Add Vercel SPA routing config to build output
