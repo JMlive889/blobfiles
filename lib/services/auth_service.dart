@@ -80,9 +80,21 @@ class AuthService {
     await _signInWithGoogleNative();
   }
 
+  /// Signs in with X (Twitter) via Supabase OAuth on all platforms.
+  ///
+  /// Configure the Twitter provider in Supabase Dashboard → Authentication
+  /// → Providers → Twitter (X). Redirect URLs must include your app origin.
+  Future<void> signInWithX() async {
+    await _signInWithOAuth(OAuthProvider.twitter);
+  }
+
   Future<void> _signInWithGoogleOAuth() async {
+    await _signInWithOAuth(OAuthProvider.google);
+  }
+
+  Future<void> _signInWithOAuth(OAuthProvider provider) async {
     await _client.auth.signInWithOAuth(
-      OAuthProvider.google,
+      provider,
       redirectTo: _oauthRedirectUrl(),
     );
   }

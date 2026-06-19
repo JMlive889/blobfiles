@@ -8,8 +8,6 @@ import '../auth/oauth_return_handler.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 
-void _onXSignIn() {}
-
 void _onForgotPassword() {}
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -24,6 +22,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _isSignIn = true;
   bool _isSubmittingEmail = false;
   bool _isGoogleLoading = false;
+  bool _isXLoading = false;
   String? _errorMessage;
   String? _infoMessage;
 
@@ -33,6 +32,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   bool get _isEmailBusy => _isSubmittingEmail;
   bool get _isGoogleBusy => _isGoogleLoading;
+  bool get _isXBusy => _isXLoading;
+  bool get _isSocialBusy => _isGoogleBusy || _isXBusy;
 
   @override
   void initState() {
@@ -57,6 +58,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     setState(() {
       _isGoogleLoading = false;
+      _isXLoading = false;
       _infoMessage = message;
       _errorMessage = null;
     });
@@ -77,16 +79,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
   }
 
-  Future<bool> _confirmGoogleRedirect() async {
+  Future<bool> _confirmSocialRedirect({
+    required String providerName,
+    required String continueLabel,
+  }) async {
     final shouldContinue = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Continue with Google?'),
-          content: const Text(
-            "You'll be redirected to Google to sign in.\n\n"
+          title: Text('Continue with $providerName?'),
+          content: Text(
+            "You'll be redirected to $providerName to sign in.\n\n"
             'To cancel at any time, use your browser back button or close '
-            "Google's sign-in page — you'll return here and can use email "
+            "$providerName's sign-in page — you'll return here and can use email "
             'instead.',
           ),
           actions: [
@@ -96,7 +101,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
             FilledButton(
               onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Continue to Google'),
+              child: Text(continueLabel),
             ),
           ],
         );
@@ -106,23 +111,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return shouldContinue ?? false;
   }
 
-  Future<void> _signInWithGoogle() async {
+  Future<void> _signInWithSocial({
+    required String providerName,
+    required String continueLabel,
+    required Future<void> Function() signIn,
+    required void Function(bool isLoading) setLoading,
+  }) async {
     _clearMessages();
 
     if (kIsWeb) {
-      final shouldContinue = await _confirmGoogleRedirect();
+      final shouldContinue = await _confirmSocialRedirect(
+        providerName: providerName,
+        continueLabel: continueLabel,
+      );
       if (!shouldContinue || !mounted) {
         return;
       }
     } else {
-      setState(() => _isGoogleLoading = true);
+      setState(() => setLoading(true));
     }
 
     try {
-      await AuthService.instance.signInWithGoogle();
+      await signIn();
 
-      // Web OAuth redirects away; native completes in-process.
-      if (!kIsWeb) {
+      // Web OAuth redirects away; native Google completes in-process.
+      if (!kIsWeb && providerName == 'Google') {
         ref.read(authProvider.notifier).syncFromClient();
         if (!mounted) return;
         context.go('/library');
@@ -132,17 +145,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       final message = AuthService.messageFromError(error);
       if (message == 'Google sign in was canceled.') {
         setState(() {
-          _isGoogleLoading = false;
+          setLoading(false);
           _infoMessage =
-              'Google sign in was canceled. You can try again or use email instead.';
+              'Sign in was canceled. You can try again or use email instead.';
         });
         return;
       }
       setState(() {
-        _isGoogleLoading = false;
+        setLoading(false);
         _errorMessage = message;
       });
     }
+  }
+
+  Future<void> _signInWithGoogle() {
+    return _signInWithSocial(
+      providerName: 'Google',
+      continueLabel: 'Continue to Google',
+      signIn: AuthService.instance.signInWithGoogle,
+      setLoading: (isLoading) => _isGoogleLoading = isLoading,
+    );
+  }
+
+  Future<void> _signInWithX() {
+    return _signInWithSocial(
+      providerName: 'X',
+      continueLabel: 'Continue to X',
+      signIn: AuthService.instance.signInWithX,
+      setLoading: (isLoading) => _isXLoading = isLoading,
+    );
   }
 
   Future<void> _submit() async {
@@ -237,9 +268,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const SizedBox(height: 32),
                     _AuthModeToggle(
                       isSignIn: _isSignIn,
-                      isEnabled: !_isEmailBusy && !_isGoogleBusy,
+                      isEnabled: !_isEmailBusy && !_isSocialBusy,
                       onChanged: (isSignIn) {
-                        if (_isEmailBusy || _isGoogleBusy) return;
+                        if (_isEmailBusy || _isSocialBusy) return;
                         setState(() {
                           _isSignIn = isSignIn;
                           _errorMessage = null;
@@ -251,27 +282,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     _SocialAuthButton(
                       label: 'Continue with Google',
                       icon: Icons.g_mobiledata_rounded,
-                      onPressed: (_isEmailBusy || _isGoogleBusy)
+                      onPressed: (_isEmailBusy || _isSocialBusy)
                           ? null
                           : _signInWithGoogle,
                     ),
-                    if (kIsWeb) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        'Redirects to Google. Use your browser back button to cancel.',
-                        textAlign: TextAlign.center,
-                        style: textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
                     const SizedBox(height: 12),
                     _SocialAuthButton(
                       label: 'Continue with X',
                       icon: Icons.close_rounded,
-                      onPressed: (_isEmailBusy || _isGoogleBusy)
+                      onPressed: (_isEmailBusy || _isSocialBusy)
                           ? null
-                          : _onXSignIn,
+                          : _signInWithX,
                     ),
                     const SizedBox(height: 32),
                     if (_errorMessage != null) ...[

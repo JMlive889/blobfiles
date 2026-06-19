@@ -13,14 +13,14 @@ String? oauthCanceledMessageFromCurrentUrl() {
   if (normalized.contains('access_denied') ||
       normalized.contains('cancel') ||
       normalized.contains('denied')) {
-    return 'Google sign in was canceled. You can try again or use email instead.';
+    return 'Sign in was canceled. You can try again or use email instead.';
   }
 
   if (description.isNotEmpty) {
     return description;
   }
 
-  return 'Google sign in could not be completed. Please try again.';
+  return 'Sign in could not be completed. Please try again.';
 }
 
 void cleanOAuthParamsFromCurrentUrl() {
