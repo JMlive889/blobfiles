@@ -4,7 +4,39 @@ A minimal Flutter web app for clipping, organizing, and sharing content.
 
 ## Session summary
 
-This README captures what was built across development sessions (initial setup + shell, auth, navigation, and Google Sign-In groundwork).
+This README captures what was built across development sessions.
+
+### Latest session (June 18–19, 2026)
+
+**Auth — Riverpod migration**
+- Replaced singleton `AuthController` with `authProvider` (Riverpod `Notifier`)
+- Wrapped app in `ProviderScope`; `appRouterProvider` drives GoRouter + auth redirects
+- Migrated `main_shell_screen`, `login_screen`, and `library_screen` to `ref.watch(authProvider)`
+- Deleted legacy `auth_controller.dart`
+
+**Deployment — GitHub Actions + Vercel**
+- Added `.github/workflows/deploy.yml`: Flutter web release build → `vercel deploy build/web --prod`
+- Simplified root `vercel.json` to SPA rewrites only (no Vercel-side Flutter build)
+- Disconnected Vercel Git auto-deploys; production deploys are CI-only
+- GitHub secrets: `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`
+- Production URL: **https://blobfiles.vercel.app**
+
+**Social login**
+- **Google (web):** Supabase OAuth; no `GOOGLE_WEB_CLIENT_ID` required on web
+- **Google (native):** `google_sign_in` + ID token; needs `--dart-define=GOOGLE_WEB_CLIENT_ID`
+- **X (Twitter):** `signInWithX()` via `OAuthProvider.twitter` + Supabase OAuth
+- Pre-redirect confirmation dialog on web (“Stay on this page” / “Continue to …”)
+- OAuth cancel detection on return (`oauth_return_handler.dart`) with friendly messages
+- Social buttons stacked vertically (`Column`) to avoid narrow-screen overflow
+
+**Supabase redirect URLs (production)**
+- Keep: `https://blobfiles.vercel.app/**` and `http://localhost:5173/**`
+- Remove auto-added Vercel preview wildcard URLs unless testing previews
+- Set **Site URL** to `https://blobfiles.vercel.app`
+
+### Earlier sessions
+
+Initial setup: design system, main shell, email/password auth, navigation, Google Sign-In groundwork.
 
 ### Design system
 
@@ -28,7 +60,7 @@ Screens use `Theme.of(context).colorScheme` — no hardcoded accent colors.
 | Route | Screen | Notes |
 |---|---|---|
 | `/landing` | Landing | Logo, tagline, Get Started |
-| `/login` | Login | Email/password + Google button; back → landing |
+| `/login` | Login | Email/password + Google + X; back → landing |
 | `/library` | Main shell | Bottom nav + AppBar + drawer (default tab: Library) |
 | `/library/profile` | Profile Settings | Inside shell — nav + drawer stay visible |
 | `/library/templates` | Templates | Inside shell |
@@ -56,6 +88,7 @@ Secondary screens use `context.go('/library/...')` (not `push`) so the shell sta
 - **AuthService** (`lib/services/auth_service.dart`):
   - `signUp`, `signIn`, `signOut`
   - `signInWithGoogle()` — web: Supabase OAuth; native: `google_sign_in` + ID token
+  - `signInWithX()` — Supabase OAuth (`OAuthProvider.twitter`) on all platforms
   - `initializeGoogleSignIn()`
   - `authStateChanges` stream
 - **authProvider** (`lib/auth/auth_provider.dart`):
@@ -79,32 +112,39 @@ Login: sign-in, sign-up, loading states, error banners, back button to landing.
 
 **First user:** use **Create Account** on the login screen.
 
-### Google Sign-In setup (required to enable button)
+### Social login setup (Supabase)
 
-1. Supabase Dashboard → **Authentication → Providers → Google** → enable
+**Redirect URLs** (Authentication → URL Configuration):
+- `http://localhost:5173/**`
+- `https://blobfiles.vercel.app/**`
+
+**Google**
+1. Supabase → **Providers → Google** → enable
 2. Google Cloud → OAuth **Web client ID** (+ secret in Supabase)
-3. Supabase → **Authentication → URL Configuration** → add `http://localhost:5173`
-4. Run with client ID:
-   ```bash
-   flutter run -d chrome --web-port 5173 \
-     --dart-define=GOOGLE_WEB_CLIENT_ID=YOUR_ID.apps.googleusercontent.com
-   ```
-   Or set `webClientId` in `lib/config/google_config.dart`.
+3. **Web/production:** works via Supabase OAuth (no app-side client ID)
+4. **Native only:** pass `--dart-define=GOOGLE_WEB_CLIENT_ID=...` or set in `google_config.dart`
+
+**X (Twitter)**
+1. Supabase → **Providers → Twitter** → enable
+2. [X Developer Portal](https://developer.x.com/) → API key + secret in Supabase
 
 ### Project structure
 
 ```
+.github/workflows/
+└── deploy.yml              # Flutter web build → Vercel production
 lib/
 ├── auth/
 │   ├── auth_provider.dart
-│   └── auth_status.dart
+│   ├── auth_status.dart
+│   ├── oauth_return_handler.dart
+│   └── oauth_return_handler_web.dart
 ├── config/
 │   ├── google_config.dart
 │   └── supabase_config.dart
 ├── main.dart
 ├── router/
-│   ├── app_router.dart
-│   └── go_router_refresh_stream.dart
+│   └── app_router.dart
 ├── screens/
 │   ├── create_screen.dart
 │   ├── help_screen.dart
@@ -120,6 +160,7 @@ lib/
 └── theme/
     ├── app_colors.dart
     └── app_theme.dart
+vercel.json               # SPA rewrites; git deploys disabled (CI deploys)
 web/
 ├── index.html          # includes passkeys_bundle.js
 └── passkeys_bundle.js  # required for supabase_flutter on web
@@ -174,9 +215,13 @@ lsof -i :5173 -t | xargs kill -9
 - [x] Persistent shell for Profile / Templates / Help
 - [x] Auth state + route protection
 - [x] Instant navigation (`NoTransitionPage`)
-- [x] Google Sign-In groundwork (`signInWithGoogle`)
-- [ ] Configure `GOOGLE_WEB_CLIENT_ID` and test Google login end-to-end
-- [ ] X OAuth
+- [x] Google Sign-In (`signInWithGoogle` — web via Supabase OAuth)
+- [x] X OAuth (`signInWithX` via Supabase)
+- [x] Riverpod auth (`authProvider`) + legacy `AuthController` removed
+- [x] GitHub Actions → Vercel production deploy
+- [x] OAuth cancel UX (confirmation dialog + return handling)
+- [ ] Configure Supabase Twitter provider and test X login end-to-end
+- [ ] Configure `GOOGLE_WEB_CLIENT_ID` for native builds (optional on web)
 - [ ] Forgot password flow
 - [ ] New tab — discovery feed
 - [ ] Create tab — content creation flow

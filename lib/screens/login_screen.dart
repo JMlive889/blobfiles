@@ -279,20 +279,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       },
                     ),
                     const SizedBox(height: 32),
-                    _SocialAuthButton(
-                      label: 'Continue with Google',
-                      icon: Icons.g_mobiledata_rounded,
-                      onPressed: (_isEmailBusy || _isSocialBusy)
-                          ? null
-                          : _signInWithGoogle,
-                    ),
-                    const SizedBox(height: 12),
-                    _SocialAuthButton(
-                      label: 'Continue with X',
-                      icon: Icons.close_rounded,
-                      onPressed: (_isEmailBusy || _isSocialBusy)
-                          ? null
-                          : _signInWithX,
+                    Column(
+                      children: [
+                        _SocialAuthButton(
+                          label: 'Continue with Google',
+                          icon: Icons.g_mobiledata_rounded,
+                          onPressed: (_isEmailBusy || _isSocialBusy)
+                              ? null
+                              : _signInWithGoogle,
+                        ),
+                        const SizedBox(height: 12),
+                        _SocialAuthButton(
+                          label: 'Continue with X',
+                          icon: Icons.close_rounded,
+                          onPressed: (_isEmailBusy || _isSocialBusy)
+                              ? null
+                              : _signInWithX,
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 32),
                     if (_errorMessage != null) ...[
