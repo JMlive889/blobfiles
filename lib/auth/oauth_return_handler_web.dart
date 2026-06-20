@@ -1,5 +1,7 @@
 import 'package:web/web.dart' as web;
 
+String webOrigin() => web.window.location.origin;
+
 String? oauthCanceledMessageFromCurrentUrl() {
   final params = _paramsFromHref(web.window.location.href);
   final error = params['error'] ?? params['error_code'];

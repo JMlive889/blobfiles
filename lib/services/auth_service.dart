@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../auth/oauth_return_handler.dart';
+import '../config/app_config.dart';
 import '../config/google_config.dart';
 
 class AuthService {
@@ -127,9 +129,10 @@ class AuthService {
   }
 
   String _oauthRedirectUrl() {
-    final base = Uri.base;
-    final path = base.path.endsWith('/') ? base.path : '${base.path}/';
-    return '${base.origin}$path';
+    if (kIsWeb) {
+      return '${OAuthReturnHandler.origin()}/';
+    }
+    return '${AppConfig.productionOrigin}/';
   }
 
   void _assertGoogleConfigured() {

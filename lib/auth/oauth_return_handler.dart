@@ -10,4 +10,6 @@ abstract final class OAuthReturnHandler {
   static void cleanCurrentUrl() {
     platform.cleanOAuthParamsFromCurrentUrl();
   }
+
+  static String origin() => platform.webOrigin();
 }
