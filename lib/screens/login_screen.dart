@@ -7,6 +7,7 @@ import '../auth/auth_provider.dart';
 import '../auth/oauth_return_handler.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/centered_content_layout.dart';
 
 void _onForgotPassword() {}
 
@@ -250,16 +251,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ),
       body: SafeArea(
         top: false,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
+        child: CenteredContentLayout(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
                     Text(
                       'blobfiles',
                       textAlign: TextAlign.center,
@@ -412,9 +409,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       textAlign: TextAlign.center,
                       style: textTheme.bodyMedium,
                     ),
-                  ],
-                ),
-              ),
+              ],
             ),
           ),
         ),

@@ -129,7 +129,7 @@ class AuthService {
   }
 
   String _oauthRedirectUrl() {
-    if (kIsWeb) {
+    if (kIsWeb && kDebugMode) {
       return '${OAuthReturnHandler.origin()}/';
     }
     return '${AppConfig.productionOrigin}/';

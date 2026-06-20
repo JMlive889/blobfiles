@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../theme/app_theme.dart';
+import '../widgets/centered_content_layout.dart';
 
 class LandingScreen extends StatelessWidget {
   const LandingScreen({super.key});
@@ -12,64 +13,57 @@ class LandingScreen extends StatelessWidget {
 
     return Scaffold(
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 480),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const _Logo(),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Your Content Archive • Clip • Organize • Share',
-                              textAlign: TextAlign.center,
-                              style: textTheme.titleLarge,
-                            ),
-                            const SizedBox(height: 48),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton(
-                                onPressed: () => context.go('/login'),
-                                style: ElevatedButton.styleFrom(
-                                  shape: AppTheme.shapeBorder,
-                                ),
-                                child: const Text('Get Started'),
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            Wrap(
-                              alignment: WrapAlignment.center,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              spacing: 8,
-                              children: [
-                                TextButton(
-                                  onPressed: () {},
-                                  child: const Text('Browse Outside'),
-                                ),
-                                TextButton(
-                                  onPressed: () {},
-                                  child: const Text('How it Works'),
-                                ),
-                              ],
-                            ),
-                          ],
+        child: CenteredContentLayout(
+          scrollable: false,
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            children: [
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const _Logo(),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Your Content Archive • Clip • Organize • Share',
+                      textAlign: TextAlign.center,
+                      style: textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 48),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => context.go('/login'),
+                        style: ElevatedButton.styleFrom(
+                          shape: AppTheme.shapeBorder,
                         ),
+                        child: const Text('Get Started'),
                       ),
-                      const _Footer(),
-                      const SizedBox(height: 24),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 20),
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      children: [
+                        TextButton(
+                          onPressed: () {},
+                          child: const Text('Browse Outside'),
+                        ),
+                        TextButton(
+                          onPressed: () {},
+                          child: const Text('How it Works'),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-            );
-          },
+              const _Footer(),
+              const SizedBox(height: 24),
+            ],
+          ),
         ),
       ),
     );

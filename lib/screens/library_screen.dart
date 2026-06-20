@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/auth_provider.dart';
+import '../widgets/centered_content_layout.dart';
 
 class LibraryScreen extends ConsumerWidget {
   const LibraryScreen({super.key});
@@ -13,15 +14,11 @@ class LibraryScreen extends ConsumerWidget {
 
     return SafeArea(
       top: false,
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+      child: CenteredContentLayout(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
                 Text(
                   'Your Library',
                   textAlign: TextAlign.center,
@@ -41,9 +38,7 @@ class LibraryScreen extends ConsumerWidget {
                     style: textTheme.bodyMedium,
                   ),
                 ],
-              ],
-            ),
-          ),
+          ],
         ),
       ),
     );
