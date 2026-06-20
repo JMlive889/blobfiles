@@ -54,17 +54,6 @@ jobs:
           fi
           flutter build web "${BUILD_ARGS[@]}"
 
-      # GoRouter needs SPA fallback rewrites so deep links resolve to index.html.
-      - name: Add Vercel SPA routing config to build output
-        run: |
-          cat > build/web/vercel.json <<'EOF'
-          {
-            "rewrites": [
-              { "source": "/(.*)", "destination": "/index.html" }
-            ]
-          }
-          EOF
-
       # ── Vercel deployment ───────────────────────────────────────────────────
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
@@ -73,5 +62,9 @@ jobs:
       - name: Pull Vercel project settings
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
+      # Package Flutter's build/web output for upload; root vercel.json supplies SPA rewrites.
+      - name: Build Vercel output (prebuilt)
+        run: vercel build --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
+
       - name: Deploy to Vercel (production)
-        run: vercel deploy build/web --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
+        run: vercel deploy --prebuilt --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
