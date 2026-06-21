@@ -10,17 +10,17 @@ part 'user_badges_provider.g.dart';
 class UserBadgesController extends _$UserBadgesController {
   @override
   Future<List<UserBadge>> build() async {
-    final authUser = ref.watch(authProvider).currentUser;
-    if (authUser == null) {
+    final userId = ref.watch(authUserIdProvider);
+    if (userId == null) {
       return const [];
     }
 
-    ref.listen(authProvider, (previous, next) {
-      if (previous?.currentUser?.id != next.currentUser?.id) {
+    ref.listen(authUserIdProvider, (previous, next) {
+      if (previous != next) {
         ref.invalidateSelf();
       }
     });
 
-    return UserBadgeService.instance.fetchByUserId(authUser.id);
+    return UserBadgeService.instance.fetchByUserId(userId);
   }
 }

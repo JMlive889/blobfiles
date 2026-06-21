@@ -69,7 +69,7 @@ class Auth extends _$Auth {
       }),
     );
 
-    return const AuthState(status: AuthStatus.unknown);
+    return _stateFromSession(auth.currentSession);
   }
 
   /// Re-reads the Supabase client session. Call after sign-in/sign-up so
@@ -100,4 +100,10 @@ class Auth extends _$Auth {
 
     return const AuthState(status: AuthStatus.unauthenticated);
   }
+}
+
+/// Stable auth user id for data providers. Rebuilds only when the id changes.
+@Riverpod(keepAlive: true)
+String? authUserId(Ref ref) {
+  return ref.watch(authProvider).currentUser?.id;
 }

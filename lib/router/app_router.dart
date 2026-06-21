@@ -10,6 +10,7 @@ import '../screens/landing_screen.dart';
 import '../screens/login_screen.dart';
 import '../screens/main_shell_screen.dart';
 import '../screens/profile_screen.dart';
+import '../screens/team_detail_screen.dart';
 import '../screens/templates_screen.dart';
 import '../theme/app_colors.dart';
 
@@ -105,6 +106,16 @@ GoRouter appRouter(Ref ref) {
                 pageBuilder: (context, state) => _noTransition(
                   state,
                   const HelpScreen(),
+                ),
+              ),
+              GoRoute(
+                path: 'teams/:teamId',
+                name: 'teamDetail',
+                pageBuilder: (context, state) => _noTransition(
+                  state,
+                  TeamDetailScreen(
+                    teamId: state.pathParameters['teamId']!,
+                  ),
                 ),
               ),
             ],

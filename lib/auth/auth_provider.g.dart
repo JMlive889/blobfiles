@@ -43,7 +43,7 @@ final class AuthProvider extends $NotifierProvider<Auth, AuthState> {
   }
 }
 
-String _$authHash() => r'56b70f086a3876c09130a1b700608dad2dd660c9';
+String _$authHash() => r'890e547e218584ce462d02b6f9d65e54d0df07f3';
 
 /// Central auth state for the app. Subscribes to Supabase [AuthState] changes.
 
@@ -64,3 +64,49 @@ abstract class _$Auth extends $Notifier<AuthState> {
     return element.handleCreate(ref, build);
   }
 }
+
+/// Stable auth user id for data providers. Rebuilds only when the id changes.
+
+@ProviderFor(authUserId)
+final authUserIdProvider = AuthUserIdProvider._();
+
+/// Stable auth user id for data providers. Rebuilds only when the id changes.
+
+final class AuthUserIdProvider
+    extends $FunctionalProvider<String?, String?, String?>
+    with $Provider<String?> {
+  /// Stable auth user id for data providers. Rebuilds only when the id changes.
+  AuthUserIdProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'authUserIdProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$authUserIdHash();
+
+  @$internal
+  @override
+  $ProviderElement<String?> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  String? create(Ref ref) {
+    return authUserId(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String?>(value),
+    );
+  }
+}
+
+String _$authUserIdHash() => r'629d96cdf76c8353c1bcf3114dbb9aac30f62a04';

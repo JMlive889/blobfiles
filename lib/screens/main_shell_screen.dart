@@ -52,7 +52,8 @@ class _MainShellScreenState extends State<MainShellScreen> {
     final path = _currentPath(context);
     return path == '/library/profile' ||
         path == '/library/templates' ||
-        path == '/library/help';
+        path == '/library/help' ||
+        path.startsWith('/library/teams/');
   }
 
   String? _secondaryTitle(String path) {
@@ -60,6 +61,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
       '/library/profile' => 'Profile Settings',
       '/library/templates' => 'Templates',
       '/library/help' => 'Help',
+      _ when path.startsWith('/library/teams/') => 'Team',
       _ => null,
     };
   }
@@ -81,7 +83,13 @@ class _MainShellScreenState extends State<MainShellScreen> {
             ? IconButton(
                 tooltip: 'Back',
                 icon: const Icon(Icons.arrow_back),
-                onPressed: () => context.go('/library'),
+                onPressed: () {
+                  if (context.canPop()) {
+                    context.pop();
+                  } else {
+                    context.go('/library');
+                  }
+                },
               )
             : null,
         title: Text(
@@ -200,10 +208,7 @@ class _MainMenuDrawer extends ConsumerWidget {
                 padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
                 child: Text(
                   'Menu',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    color: colorScheme.onSurface,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: theme.textTheme.titleLarge,
                 ),
               ),
             ),

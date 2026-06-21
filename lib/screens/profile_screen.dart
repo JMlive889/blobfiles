@@ -1,16 +1,23 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../auth/auth_provider.dart';
+import '../services/auth_service.dart';
 import '../models/user_badge.dart';
 import '../profile/profile_edit_provider.dart';
+import '../models/user_team_membership.dart';
 import '../profile/user_badges_provider.dart';
+import '../profile/user_teams_provider.dart';
 import '../profile/user_profile_provider.dart';
+import '../services/team_service.dart';
 import '../services/user_profile_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/username_validator.dart';
 import '../widgets/centered_scroll_view.dart';
+import '../widgets/team_image_placeholder.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -25,14 +32,106 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final _bioController = TextEditingController();
 
   bool _isSaving = false;
+  bool _isCheckingUsername = false;
   String? _actionError;
+  String? _usernameAvailabilityError;
+  Timer? _usernameAvailabilityDebounce;
 
   @override
   void dispose() {
+    _usernameAvailabilityDebounce?.cancel();
     _usernameController.dispose();
     _fullNameController.dispose();
     _bioController.dispose();
     super.dispose();
+  }
+
+  void _clearUsernameAvailabilityState() {
+    _usernameAvailabilityDebounce?.cancel();
+    _isCheckingUsername = false;
+    _usernameAvailabilityError = null;
+  }
+
+  String? _usernameInlineError(String username) {
+    return UsernameValidator.getUsernameError(username) ??
+        _usernameAvailabilityError;
+  }
+
+  void _scheduleUsernameAvailabilityCheck({
+    required String username,
+    required String userId,
+    required String savedUsername,
+  }) {
+    _usernameAvailabilityDebounce?.cancel();
+    _usernameAvailabilityDebounce = Timer(
+      const Duration(milliseconds: 400),
+      () => _checkUsernameAvailability(
+        username: username,
+        userId: userId,
+        savedUsername: savedUsername,
+      ),
+    );
+  }
+
+  Future<void> _checkUsernameAvailability({
+    required String username,
+    required String userId,
+    required String savedUsername,
+  }) async {
+    final trimmed = username.trim();
+    final validatorError = UsernameValidator.getUsernameError(trimmed);
+    if (validatorError != null) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isCheckingUsername = false;
+        _usernameAvailabilityError = null;
+      });
+      return;
+    }
+
+    if (trimmed.toLowerCase() == savedUsername.trim().toLowerCase()) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isCheckingUsername = false;
+        _usernameAvailabilityError = null;
+      });
+      return;
+    }
+
+    setState(() => _isCheckingUsername = true);
+
+    try {
+      final available = await UserProfileService.instance.isUsernameAvailable(
+        username: trimmed,
+        userId: userId,
+      );
+      if (!mounted) {
+        return;
+      }
+
+      final currentUsername = ref.read(profileEditProvider)?.username.trim();
+      if (currentUsername != trimmed) {
+        return;
+      }
+
+      setState(() {
+        _isCheckingUsername = false;
+        _usernameAvailabilityError =
+            available ? null : 'That username is already taken.';
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isCheckingUsername = false;
+        _usernameAvailabilityError = null;
+      });
+    }
   }
 
   void _startEditing({
@@ -40,7 +139,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     required String fullName,
     required String bio,
   }) {
-    setState(() => _actionError = null);
+    setState(() {
+      _actionError = null;
+      _clearUsernameAvailabilityState();
+    });
     ref.read(profileEditProvider.notifier).startEditing(
           username: username,
           fullName: fullName,
@@ -52,7 +154,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   void _cancelEditing() {
-    setState(() => _actionError = null);
+    setState(() {
+      _actionError = null;
+      _clearUsernameAvailabilityState();
+    });
     ref.read(profileEditProvider.notifier).cancel();
     FocusScope.of(context).unfocus();
   }
@@ -63,9 +168,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       return;
     }
 
-    final usernameError = UsernameValidator.getUsernameError(draft.username);
-    if (usernameError != null) {
-      setState(() => _actionError = usernameError);
+    final usernameError = _usernameInlineError(draft.username);
+    if (usernameError != null || _isCheckingUsername) {
       return;
     }
 
@@ -87,8 +191,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       if (!mounted) {
         return;
       }
+      final message = _messageFromError(error);
       setState(() {
-        _actionError = _messageFromError(error);
+        if (message == 'That username is already taken.') {
+          _usernameAvailabilityError = message;
+          _actionError = null;
+        } else {
+          _actionError = message;
+        }
       });
     } finally {
       if (mounted) {
@@ -101,41 +211,73 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (error is UserProfileUpdateException) {
       return error.message;
     }
+    if (error is TeamCreateException) {
+      return error.message;
+    }
     if (error is AuthException) {
       return error.message;
     }
     return 'Could not save profile. Please try again.';
   }
 
+  void _openTeamDetail(UserTeamMembership membership) {
+    context.push('/library/teams/${membership.teamId}');
+  }
+
+  Future<void> _showCreateTeamDialog() async {
+    final teamName = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => const _CreateTeamDialog(),
+    );
+
+    if (teamName == null || teamName.trim().isEmpty || !mounted) {
+      return;
+    }
+
+    try {
+      await ref
+          .read(userTeamsControllerProvider.notifier)
+          .createTeam(teamName.trim());
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Team created')),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_messageFromError(error))),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final auth = ref.watch(authProvider);
     final profileAsync = ref.watch(userProfileControllerProvider);
     final badgesAsync = ref.watch(userBadgesControllerProvider);
+    final teamsAsync = ref.watch(userTeamsControllerProvider);
     final editDraft = ref.watch(profileEditProvider);
     final isEditing = editDraft != null;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    if (auth.isLoading) {
-      return const SafeArea(
-        top: false,
-        child: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    final authUser = auth.currentUser;
-    if (authUser == null) {
+    if (!AuthService.instance.isAuthenticated) {
       return SafeArea(
         top: false,
         child: Center(
           child: Text(
-            'No user signed in.',
+            'You must be signed in to view your profile.',
             style: theme.textTheme.bodyLarge,
+            textAlign: TextAlign.center,
           ),
         ),
       );
     }
+
+    final authUser = AuthService.instance.currentUser!;
 
     if (profileAsync.isLoading && !profileAsync.hasValue) {
       return const SafeArea(
@@ -144,38 +286,26 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       );
     }
 
-    if (profileAsync.hasError && !profileAsync.hasValue) {
+    if (profileAsync.hasError) {
       return SafeArea(
         top: false,
         child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Could not load profile.',
-                  style: theme.textTheme.bodyLarge,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: () =>
-                      ref.invalidate(userProfileControllerProvider),
-                  child: const Text('Retry'),
-                ),
-              ],
-            ),
-          ),
+          child: Text('Error: ${profileAsync.error}'),
         ),
       );
     }
 
     final profile = profileAsync.value;
-    final usernameError = isEditing
-        ? UsernameValidator.getUsernameError(editDraft.username)
+    final savedUsername = profile?.username ??
+        _readString(authUser.userMetadata?['username']) ??
+        _usernameFromEmail(authUser.email);
+    final usernameInlineError = isEditing
+        ? _usernameInlineError(editDraft.username)
         : null;
-    final canSave = isEditing && usernameError == null && !_isSaving;
+    final canSave = isEditing &&
+        usernameInlineError == null &&
+        !_isCheckingUsername &&
+        !_isSaving;
 
     return SafeArea(
       top: false,
@@ -289,6 +419,29 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                   const SizedBox(height: 12),
                   _ProfileBadgesSection(badgesAsync: badgesAsync),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'My Teams',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Create Team',
+                        onPressed: _showCreateTeamDialog,
+                        icon: const Icon(Icons.add_circle),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _ProfileTeamsSection(
+                    teamsAsync: teamsAsync,
+                    onTeamTap: _openTeamDetail,
+                  ),
                 ] else ...[
                   Text(
                     'Edit Profile',
@@ -310,8 +463,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     label: 'Username',
                     hint: 'yourname',
                     enabled: !_isSaving,
-                    errorText: usernameError,
-                    onChanged: ref.read(profileEditProvider.notifier).updateUsername,
+                    errorText: usernameInlineError,
+                    onChanged: (value) {
+                      ref
+                          .read(profileEditProvider.notifier)
+                          .updateUsername(value);
+                      setState(() => _usernameAvailabilityError = null);
+                      _scheduleUsernameAvailabilityCheck(
+                        username: value,
+                        userId: authUser.id,
+                        savedUsername: savedUsername,
+                      );
+                    },
                   ),
                   _ProfileField(
                     label: 'Email',
@@ -522,6 +685,174 @@ class _ProfileField extends StatelessWidget {
             overflow: multiline ? null : TextOverflow.ellipsis,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _CreateTeamDialog extends StatefulWidget {
+  const _CreateTeamDialog();
+
+  @override
+  State<_CreateTeamDialog> createState() => _CreateTeamDialogState();
+}
+
+class _CreateTeamDialogState extends State<_CreateTeamDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      return;
+    }
+    Navigator.of(context).pop(_nameController.text.trim());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Create Team'),
+      content: Form(
+        key: _formKey,
+        child: TextFormField(
+          controller: _nameController,
+          autofocus: true,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(
+            labelText: 'Team Name',
+            hintText: 'Enter a team name',
+          ),
+          validator: (value) {
+            if ((value ?? '').trim().isEmpty) {
+              return 'Team name is required';
+            }
+            return null;
+          },
+          onFieldSubmitted: (_) => _submit(),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: const Text('Create'),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProfileTeamsSection extends StatelessWidget {
+  const _ProfileTeamsSection({
+    required this.teamsAsync,
+    required this.onTeamTap,
+  });
+
+  final AsyncValue<List<UserTeamMembership>> teamsAsync;
+  final ValueChanged<UserTeamMembership> onTeamTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return teamsAsync.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (_, _) => Text(
+        'Could not load teams.',
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: colorScheme.onSurfaceVariant,
+        ),
+      ),
+      data: (teams) {
+        if (teams.isEmpty) {
+          return Text(
+            'You don’t belong to any teams yet.',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          );
+        }
+
+        return Column(
+          children: [
+            for (final membership in teams) ...[
+              _ProfileTeamRow(
+                membership: membership,
+                onTap: () => onTeamTap(membership),
+              ),
+              const SizedBox(height: 12),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ProfileTeamRow extends StatelessWidget {
+  const _ProfileTeamRow({
+    required this.membership,
+    required this.onTap,
+  });
+
+  final UserTeamMembership membership;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppTheme.borderRadiusAll,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            children: [
+              const TeamImagePlaceholder(size: 48),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      membership.teamName,
+                      style: theme.textTheme.bodyLarge,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      membership.roleLabel,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.primary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

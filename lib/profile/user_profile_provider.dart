@@ -13,18 +13,18 @@ part 'user_profile_provider.g.dart';
 class UserProfileController extends _$UserProfileController {
   @override
   Future<UserProfile?> build() async {
-    final authUser = ref.watch(authProvider).currentUser;
-    if (authUser == null) {
+    final userId = ref.watch(authUserIdProvider);
+    if (userId == null) {
       return null;
     }
 
-    ref.listen(authProvider, (previous, next) {
-      if (previous?.currentUser?.id != next.currentUser?.id) {
+    ref.listen(authUserIdProvider, (previous, next) {
+      if (previous != next) {
         ref.invalidateSelf();
       }
     });
 
-    return UserProfileService.instance.fetchById(authUser.id);
+    return UserProfileService.instance.fetchById(userId);
   }
 
   Future<void> saveDraft(ProfileEditDraft draft) async {

@@ -34,7 +34,7 @@ final class UserBadgesControllerProvider
 }
 
 String _$userBadgesControllerHash() =>
-    r'c1233f8bc3e125d2cd58e4009e75becf534f489a';
+    r'aaf5b4fd211ae0615986bbfda03456396a240d6b';
 
 abstract class _$UserBadgesController extends $AsyncNotifier<List<UserBadge>> {
   FutureOr<List<UserBadge>> build();

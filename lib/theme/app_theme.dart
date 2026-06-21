@@ -73,6 +73,7 @@ abstract final class AppTheme {
       textTheme: _textTheme(
         textPrimary: textPrimary,
         textSecondary: textSecondary,
+        accent: accent,
         onAccent: onAccent,
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -100,9 +101,14 @@ abstract final class AppTheme {
       ),
       appBarTheme: AppBarTheme(
         backgroundColor: background,
-        foregroundColor: textPrimary,
+        foregroundColor: accent,
         elevation: 0,
         centerTitle: true,
+        titleTextStyle: TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          color: accent,
+        ),
       ),
       cardTheme: CardThemeData(
         color: surface,
@@ -166,24 +172,63 @@ abstract final class AppTheme {
   static TextTheme _textTheme({
     required Color textPrimary,
     required Color textSecondary,
+    required Color accent,
     required Color onAccent,
   }) {
+    final headlineStyle = TextStyle(
+      fontWeight: FontWeight.w600,
+      color: accent,
+    );
+
     return TextTheme(
+      displayLarge: TextStyle(
+        fontSize: 48,
+        fontWeight: FontWeight.w700,
+        color: accent,
+        letterSpacing: -0.5,
+      ),
       displayMedium: TextStyle(
         fontSize: 40,
         fontWeight: FontWeight.w700,
-        color: textPrimary,
+        color: accent,
         letterSpacing: -0.5,
       ),
+      displaySmall: TextStyle(
+        fontSize: 32,
+        fontWeight: FontWeight.w700,
+        color: accent,
+        letterSpacing: -0.25,
+      ),
+      headlineLarge: headlineStyle.copyWith(fontSize: 28),
+      headlineMedium: headlineStyle.copyWith(fontSize: 24),
+      headlineSmall: headlineStyle.copyWith(fontSize: 20),
       titleLarge: TextStyle(
         fontSize: 18,
-        fontWeight: FontWeight.w500,
-        color: textSecondary,
+        fontWeight: FontWeight.w600,
+        color: accent,
         height: 1.5,
+      ),
+      titleMedium: TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+        color: accent,
+      ),
+      titleSmall: TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: accent,
+      ),
+      bodyLarge: TextStyle(
+        fontSize: 16,
+        color: textPrimary,
       ),
       bodyMedium: TextStyle(
         fontSize: 14,
-        color: textSecondary,
+        color: textPrimary,
+      ),
+      bodySmall: TextStyle(
+        fontSize: 12,
+        color: textPrimary,
       ),
       labelLarge: TextStyle(
         fontSize: 16,
