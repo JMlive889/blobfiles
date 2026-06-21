@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../theme/app_theme.dart';
-import '../widgets/centered_content_layout.dart';
+import '../widgets/centered_scroll_view.dart';
 
 class LandingScreen extends StatelessWidget {
   const LandingScreen({super.key});
@@ -13,9 +13,8 @@ class LandingScreen extends StatelessWidget {
 
     return Scaffold(
       body: SafeArea(
-        child: CenteredContentLayout(
+        child: CenteredScrollView(
           scrollable: false,
-          alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Column(
             children: [

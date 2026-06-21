@@ -1,3 +1,4 @@
+import 'package:meta/meta.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/user_profile.dart';
@@ -32,11 +33,17 @@ class UserProfileService {
     String? fullName,
     String? bio,
   }) async {
+    final trimmedUsername = username.trim();
+    await _ensureUsernameAvailable(
+      username: trimmedUsername,
+      userId: userId,
+    );
+
     final existing = await fetchById(userId);
     if (existing == null) {
       return _insert(
         userId: userId,
-        username: username,
+        username: trimmedUsername,
         fullName: fullName,
         bio: bio,
       );
@@ -44,7 +51,7 @@ class UserProfileService {
 
     return _update(
       userId: userId,
-      username: username,
+      username: trimmedUsername,
       fullName: fullName,
       bio: bio,
     );
@@ -104,9 +111,77 @@ class UserProfileService {
     }
   }
 
+  /// Checks case-insensitive username availability for [userId].
+  Future<bool> isUsernameAvailable({
+    required String username,
+    required String userId,
+  }) async {
+    final available = await _client.rpc(
+      'is_username_available',
+      params: {
+        'p_username': username.trim(),
+        'p_user_id': userId,
+      },
+    );
+    return _parseAvailability(available);
+  }
+
+  Future<void> _ensureUsernameAvailable({
+    required String username,
+    required String userId,
+  }) async {
+    try {
+      final available = await isUsernameAvailable(
+        username: username,
+        userId: userId,
+      );
+
+      if (!available) {
+        throw const UserProfileUpdateException(
+          'That username is already taken.',
+        );
+      }
+    } on UserProfileUpdateException {
+      rethrow;
+    } on PostgrestException catch (error) {
+      // RPC not deployed yet — rely on the unique index during insert/update.
+      final message = error.message.toLowerCase();
+      if (!message.contains('is_username_available') &&
+          !message.contains('could not find the function')) {
+        throw _mapPostgrestError(error);
+      }
+    }
+  }
+
+  @visibleForTesting
+  static bool parseAvailabilityForTest(dynamic available) =>
+      _parseAvailability(available);
+
+  static bool _parseAvailability(dynamic available) {
+    if (available is bool) {
+      return available;
+    }
+    if (available is String) {
+      return available.toLowerCase() == 'true';
+    }
+    return false;
+  }
+
+  @visibleForTesting
+  static bool isUsernameUniqueViolationForTest({
+    required String? code,
+    required String message,
+    String? details,
+  }) =>
+      _isUsernameUniqueViolation(code, message, details);
+
   UserProfileUpdateException _mapPostgrestError(PostgrestException error) {
     final message = error.message.toLowerCase();
-    if (_isUsernameUniqueViolation(error.code, message)) {
+    if (_isUsernameUniqueViolation(
+      error.code,
+      message,
+      error.details?.toString(),
+    )) {
       return const UserProfileUpdateException(
         'That username is already taken.',
       );
@@ -123,14 +198,23 @@ class UserProfileService {
     );
   }
 
-  bool _isUsernameUniqueViolation(String? code, String message) {
-    if (code != '23505') {
-      return false;
+  static bool _isUsernameUniqueViolation(
+    String? code,
+    String message,
+    String? details,
+  ) {
+    final haystack = '$message ${details ?? ''}'.toLowerCase();
+
+    if (haystack.contains('users_username_lower_idx') ||
+        haystack.contains('users_username_idx')) {
+      return true;
     }
 
-    return message.contains('users_username_lower_idx') ||
-        message.contains('users_username_idx') ||
-        message.contains('username');
+    if (code == '23505') {
+      return haystack.contains('username');
+    }
+
+    return false;
   }
 }
 

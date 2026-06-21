@@ -7,7 +7,7 @@ import '../auth/auth_provider.dart';
 import '../auth/oauth_return_handler.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/centered_content_layout.dart';
+import '../widgets/centered_scroll_view.dart';
 
 void _onForgotPassword() {}
 
@@ -251,7 +251,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ),
       body: SafeArea(
         top: false,
-        child: CenteredContentLayout(
+        child: CenteredScrollView(
+          alignment: Alignment.topCenter,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
           child: Form(
             key: _formKey,
             child: Column(

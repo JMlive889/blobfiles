@@ -10,7 +10,7 @@ import '../profile/user_profile_provider.dart';
 import '../services/user_profile_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/username_validator.dart';
-import '../widgets/centered_content_layout.dart';
+import '../widgets/centered_scroll_view.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -194,7 +194,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           final bio = profile?.bio ?? _readString(metadata['bio']);
           final email = authUser.email;
 
-          return CenteredContentLayout(
+          return CenteredScrollView(
+            alignment: Alignment.topCenter,
             padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,

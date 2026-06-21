@@ -6,7 +6,23 @@ A minimal Flutter web app for clipping, organizing, and sharing content.
 
 This README captures what was built across development sessions.
 
-### Latest session (June 18–19, 2026)
+### Latest session (June 21, 2026)
+
+**Layout — wrapper stabilization (`CenteredScrollView`)**
+- Replaced fragile `CenteredContentLayout` with `CenteredScrollView` (`lib/widgets/centered_scroll_view.dart`)
+- Full-viewport scroll canvas (`minWidth` + `minHeight`) centers sparse content; explicit pane width fixes `CrossAxisAlignment.stretch` on mobile and wide viewports
+- `MainShellScreen` body wrapped in `SizedBox.expand` so `IndexedStack` tab children get bounded constraints
+- Library placeholder uses default `Alignment.center`; login/profile use `topCenter`
+- Regression tests: `test/centered_scroll_view_test.dart`
+
+**Profile — username uniqueness**
+- Pre-save check via Supabase RPC `is_username_available` (case-insensitive, RLS-safe `security definer`)
+- Migration: `supabase/migrations/20250620270000_username_availability_rpc.sql` + unique index `users_username_lower_idx`
+- `UserProfileService.isUsernameAvailable()` with safe bool parsing; duplicate-key fallback on insert/update
+- Tests: `test/user_profile_service_test.dart`, optional live test `test/username_uniqueness_integration_test.dart` (two accounts via env vars)
+- Uniqueness is enforced on the shared Supabase project — localhost and production use the same rules
+
+### Earlier session (June 18–19, 2026)
 
 **Auth — Riverpod migration**
 - Replaced singleton `AuthController` with `authProvider` (Riverpod `Notifier`)
@@ -36,7 +52,7 @@ This README captures what was built across development sessions.
 
 ### Earlier sessions
 
-Initial setup: design system, main shell, email/password auth, navigation, Google Sign-In groundwork.
+Initial setup: design system, main shell, email/password auth, navigation, Google Sign-In groundwork. Profile page, user config, and `CenteredContentLayout` (later replaced) in June 20 session.
 
 ### Design system
 

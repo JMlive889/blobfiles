@@ -100,16 +100,18 @@ class _MainShellScreenState extends State<MainShellScreen> {
       endDrawer: _MainMenuDrawer(
         onClose: () => _scaffoldKey.currentState?.closeEndDrawer(),
       ),
-      body: isSecondary
-          ? widget.child
-          : IndexedStack(
-              index: _currentIndex,
-              children: const [
-                NewScreen(),
-                LibraryScreen(),
-                CreateScreen(),
-              ],
-            ),
+      body: SizedBox.expand(
+        child: isSecondary
+            ? widget.child
+            : IndexedStack(
+                index: _currentIndex,
+                children: const [
+                  NewScreen(),
+                  LibraryScreen(),
+                  CreateScreen(),
+                ],
+              ),
+      ),
       bottomNavigationBar: ColoredBox(
         color: colorScheme.surface,
         child: SafeArea(

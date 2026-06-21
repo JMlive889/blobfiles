@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/auth_provider.dart';
-import '../widgets/centered_content_layout.dart';
+import '../widgets/centered_scroll_view.dart';
 
 class LibraryScreen extends ConsumerWidget {
   const LibraryScreen({super.key});
@@ -14,9 +14,9 @@ class LibraryScreen extends ConsumerWidget {
 
     return SafeArea(
       top: false,
-      child: CenteredContentLayout(
-        padding: const EdgeInsets.all(24),
+      child: CenteredScrollView(
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
                 Text(
